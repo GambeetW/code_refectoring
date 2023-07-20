@@ -71,17 +71,17 @@ class BookingRepository extends BaseRepository
         }
         if ($jobs) {
             foreach ($jobs as $jobitem) {
-                if ($jobitem->immediate == 'yes') {
+                if ($jobitem->immediate == 'yes')
                     $emergencyJobs[] = $jobitem;
-                } else {
+                else
                     $noramlJobs[] = $jobitem;
-                }
             }
             $noramlJobs = collect($noramlJobs)->each(function ($item, $key) use ($user_id) {
                 $item['usercheck'] = Job::checkParticularJob($user_id, $item);
             })->sortBy('due')->all();
         }
 
+        // just use the concat in this case rather than mentioning same name as variable (XD)
         return ['emergencyJobs' => $emergencyJobs, 'noramlJobs' => $noramlJobs, 'cuser' => $cuser, 'usertype' => $usertype];
     }
 
@@ -139,8 +139,27 @@ class BookingRepository extends BaseRepository
                 $response['field_name'] = "from_language_id";
                 return $response;
             }
+
+            /**
+             * Must use the switch case instead of if else nest, switch work efficietly
+             */
             if ($data['immediate'] == 'no') {
-                if (isset($data['due_date']) && $data['due_date'] == '') {
+                switch($data) {
+                    case isset($data['due_date']):
+                    case $data['due_date'] == '':
+                    case isset($data['due_time']):
+                    case $data['due_time'] == '':
+                        $response['status'] = 'fail';
+                        $response['message'] = "Du måste fylla in alla fält";
+                        /**
+                         * Only one field was unique the rest were repeating itselves.
+                         */
+                        $response['field_name'] = ($data['due_time'] == '') ? "due_time" : "due_date";
+                        return $response;
+                    break;
+                    
+                }
+                /* if (isset($data['due_date']) && $data['due_date'] == '') {
                     $response['status'] = 'fail';
                     $response['message'] = "Du måste fylla in alla fält";
                     $response['field_name'] = "due_date";
@@ -151,7 +170,7 @@ class BookingRepository extends BaseRepository
                     $response['message'] = "Du måste fylla in alla fält";
                     $response['field_name'] = "due_time";
                     return $response;
-                }
+                } */
                 if (!isset($data['customer_phone_type']) && !isset($data['customer_physical_type'])) {
                     $response['status'] = 'fail';
                     $response['message'] = "Du måste göra ett val här";

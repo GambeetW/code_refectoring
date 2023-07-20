@@ -14,6 +14,8 @@ use DTApi\Repository\BookingRepository;
  */
 class BookingController extends Controller
 {
+    protected $super_admin_role_id = env('SUPERADMIN_ROLE_ID');
+    protected $admin_role_id = env('ADMIN_ROLE_ID');
 
     /**
      * @var BookingRepository
@@ -29,23 +31,28 @@ class BookingController extends Controller
         $this->repository = $bookingRepository;
     }
 
+    // return needs to be specific rather than mixed.
     /**
      * @param Request $request
      * @return mixed
      */
     public function index(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
-
+        if($user_id = $request->get('user_id'))
             $response = $this->repository->getUsersJobs($user_id);
-
-        }
-        elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
-        {
+        elseif($this->check_authenticated_user_type($request->__authenticatedUser->user_type))
             $response = $this->repository->getAll($request);
-        }
+        // elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
+        // instead of a nest of same data_type make function and make it reusable like DRY approach also instead of using env everywhere make it protected in a compact variable like KISS(Keep It Simple Stupid) approach (XD)
+        
 
         return response($response);
+    }
+
+    protected function check_authenticated_user_type($user_type) {
+        if(in_array($user_type, [$this->super_admin_role_id, $this->admin_role_id]))
+            return true;
+        return false;
     }
 
     /**
@@ -194,62 +201,60 @@ class BookingController extends Controller
 
     public function distanceFeed(Request $request)
     {
+        /* First of all here every request with form data requires validation inside the model where the data can be filtered, we can create a custom validation rules for them instead of making multiple checks. */
+
         $data = $request->all();
-
-        if (isset($data['distance']) && $data['distance'] != "") {
-            $distance = $data['distance'];
-        } else {
-            $distance = "";
-        }
-        if (isset($data['time']) && $data['time'] != "") {
-            $time = $data['time'];
-        } else {
-            $time = "";
-        }
-        if (isset($data['jobid']) && $data['jobid'] != "") {
-            $jobid = $data['jobid'];
-        }
-
-        if (isset($data['session_time']) && $data['session_time'] != "") {
-            $session = $data['session_time'];
-        } else {
-            $session = "";
-        }
-
-        if ($data['flagged'] == 'true') {
-            if($data['admincomment'] == '') return "Please, add comment";
-            $flagged = 'yes';
-        } else {
-            $flagged = 'no';
-        }
         
-        if ($data['manually_handled'] == 'true') {
-            $manually_handled = 'yes';
-        } else {
-            $manually_handled = 'no';
-        }
 
-        if ($data['by_admin'] == 'true') {
-            $by_admin = 'yes';
-        } else {
-            $by_admin = 'no';
-        }
+        $distance = (isset($data['distance']) && $data['distance'] == true) ? 'yes' : 'no';
 
-        if (isset($data['admincomment']) && $data['admincomment'] != "") {
-            $admincomment = $data['admincomment'];
-        } else {
-            $admincomment = "";
-        }
-        if ($time || $distance) {
 
+        $time = (isset($data['time']) && $data['time'] == true) ? 'yes' : 'no';
+
+        if ($time || $distance)
             $affectedRows = Distance::where('job_id', '=', $jobid)->update(array('distance' => $distance, 'time' => $time));
-        }
+        
+        if (isset($data['jobid']) && $data['jobid'] != "")
+            $jobid = $data['jobid'];
 
-        if ($admincomment || $session || $flagged || $manually_handled || $by_admin) {
+        $session = "";
+        if (isset($data['session_time']) && $data['session_time'] != "")
+            $session = $data['session_time'];
+        
+        /* $flagged = 'no';
+        if ($data['flagged'] == 'true')
+            if($data['admincomment'] == '') 
+                return "Please, add comment";
+            $flagged = 'yes'; */
+        
+        $flagged = (isset($data['flagged']) && $data['flagged'] == true) ? 'yes' : 'no';
+        
+        if($data['admincomment'] == '') 
+            return "Please, add comment";
+ 
+        
+        /* $manually_handled = 'no';
+        if ($data['manually_handled'] == 'true')
+            $manually_handled = 'yes'; */
 
+        $manually_handled = (isset($data['manually_handled']) && $data['manually_handled'] == true) ? 'yes' : 'no';
+ 
+        
+        /* $by_admin = 'no';
+        if ($data['by_admin'] == 'true')
+            $by_admin = 'yes'; */
+
+        $by_admin = (isset($data['by_admin']) && $data['by_admin'] == true) ? 'yes' : 'no';
+ 
+        
+        /* $admincomment = "";
+        if (isset($data['admincomment']) && $data['admincomment'] != "")
+            $admincomment = $data['admincomment']; */
+
+        $admincomment = (isset($data['admincomment']) && !empty($data['admincomment'])) ? 'yes' : 'no';
+
+        if ($admincomment || $session || $flagged || $manually_handled || $by_admin)
             $affectedRows1 = Job::where('id', '=', $jobid)->update(array('admin_comments' => $admincomment, 'flagged' => $flagged, 'session_time' => $session, 'manually_handled' => $manually_handled, 'by_admin' => $by_admin));
-
-        }
 
         return response('Record updated!');
     }
